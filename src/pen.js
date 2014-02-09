@@ -365,4 +365,7 @@
   // make it accessible
   this.Pen = doc.getSelection ? Pen : FakePen;
 
+  // export
+  if ( typeof module === "object" && module && typeof module.exports === "object" ) module.exports = this.Pen;
+
 }(document));
