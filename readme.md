@@ -66,10 +66,12 @@ defaults = {
 
 If you want to customize the toolbar to fit your own project, you can instanciate `Pen` constructor with an `options` object like [#1.3: init with options](https://github.com/sofish/pen#13-init-with-options):
 
-disabeld the toolbar:
+disabe the toolbar:
+
 
 ```js
-{
+var options = {
+  // your options
   list: null
 }
 ```
