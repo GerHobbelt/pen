@@ -134,6 +134,10 @@
 
   Pen.prototype.toolbar = function() {
 
+    if (this.config.list === null) {
+        return;
+    }
+
     var that = this, icons = '';
 
     for(var i = 0, list = this.config.list; i < list.length; i++) {

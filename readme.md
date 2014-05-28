@@ -66,6 +66,15 @@ defaults = {
 
 If you want to customize the toolbar to fit your own project, you can instanciate `Pen` constructor with an `options` object like [#1.3: init with options](https://github.com/sofish/pen#13-init-with-options):
 
+disabeld the toolbar:
+
+```js
+{
+  list: null
+}
+```
+
+
 #### 2.1 Fallback for old browser
 
 You can set `defaults.textarea` to a piece of HTML string, by default, it's `<textarea name="content"></textarea>`。This will be set as `innerHTML` of your `#editor`.
