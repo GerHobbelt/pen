@@ -9,7 +9,7 @@
   var commandsReg = {
     block: /^(?:p|h[1-6]|blockquote|pre)$/,
     inline: /^(?:bold|italic|underline|insertorderedlist|insertunorderedlist|indent|outdent)$/,
-    source: /^(?:createlink|unlink)$/,
+    source: /^(?:createlink|unlink|forecolor)$/,
     insert: /^(?:inserthorizontalrule|insertimage|insert)$/,
     wrap: /^(?:code)$/
   };
@@ -86,7 +86,7 @@
       textarea: '<textarea name="content"></textarea>',
       list: [
         'blockquote', 'h2', 'h3', 'p', 'code', 'insertorderedlist', 'insertunorderedlist', 'inserthorizontalrule',
-        'indent', 'outdent', 'bold', 'italic', 'underline', 'createlink', 'insertimage'
+        'indent', 'outdent', 'bold', 'italic', 'underline', 'createlink', 'insertimage', 'forecolor'
       ],
       cleanAttrs: ['id', 'class', 'style', 'name'],
       cleanTags: ['script']
@@ -141,7 +141,9 @@
   }
 
   function initToolbar(ctx) {
-    var icons = '', inputStr = '<input class="pen-input" placeholder="http://" />';
+    var icons = '', inputStr = '<input class="pen-input" placeholder="http://" />', 
+    colorInputStr = '<input class="pen-input" placeholder="color:#" />';
+    // console.log('------------init-------------');
 
     ctx._toolbar = ctx.config.toolbar;
     if (!ctx._toolbar) {
@@ -152,9 +154,11 @@
       }, true);
       if (toolList.indexOf('createlink') >= 0 || toolList.indexOf('createlink') >= 0)
         icons += inputStr;
+      if (toolList.indexOf('forecolor') >= 0 || toolList.indexOf('forecolor') >= 0)
+        icons += colorInputStr;
     } else if (ctx._toolbar.querySelectorAll('[data-action=createlink]').length ||
       ctx._toolbar.querySelectorAll('[data-action=insertimage]').length) {
-      icons += inputStr;
+      icons += ctx._toolbar.querySelectorAll('[data-action=forecolor]').length ? colorInputStr : inputStr;
     }
 
     if (icons) {
@@ -164,6 +168,9 @@
       ctx._inputBar = ctx._menu.querySelector('input');
       toggleNode(ctx._menu, true);
       doc.body.appendChild(ctx._menu);
+      $(ctx._menu).find('input').colorpicker({
+        container: $(ctx._menu)
+      });
     }
     if (ctx._toolbar && ctx._inputBar) toggleNode(ctx._inputBar);
   }
@@ -260,18 +267,20 @@
     // toggle toolbar on key select
     addListener(ctx, toolbar, 'click', function(e) {
       var node = e.target, action;
-
       while (node !== toolbar && !(action = node.getAttribute('data-action'))) {
         node = node.parentNode;
       }
 
       if (!action) return;
-      if (!/(?:createlink)|(?:insertimage)/.test(action)) return menuApply(action);
+      if (!/(?:createlink)|(?:forecolor)|(?:insertimage)/.test(action)) return menuApply(action);
       if (!ctx._inputBar) return;
 
       // create link
       var input = ctx._inputBar;
-      if (toolbar === ctx._menu) toggleNode(input);
+      if (toolbar === ctx._menu) {
+        toggleNode(input);
+        input.value = $(input).data('colorpicker').color;
+      }
       else {
         ctx._inputActive = true;
         ctx.menu();
@@ -294,8 +303,18 @@
         else toggleNode(ctx._menu, true);
       };
 
+      var forecolor = function () {
+        var inputValue = input.value;
+        if (!inputValue) inputValue = '#000';
+        menuApply(action, inputValue);
+        // if (toolbar === ctx._menu) toggleNode(input, false);
+        // else toggleNode(ctx._menu, true);
+      };
+      input.onblur = function () {
+        return forecolor();
+      };
       input.onkeypress = function(e) {
-        if (e.which === 13) return createlink();
+        if (e.which === 13) return forecolor();
       };
 
     });
@@ -453,6 +472,7 @@
 
   function urlToLink(str) {
     var count = 0;
+    console.log('urlToLink');
     str = str.replace(autoLinkReg.url, function(url) {
       var realUrl = url, displayUrl = url;
       count++;
@@ -621,6 +641,11 @@
     return this.getContent();
   };
 
+  Pen.prototype.autoColor = function() {
+    autoColor(this.config.editor);
+    return this.getContent();
+  };
+
   // highlight menu
   Pen.prototype.highlight = function() {
     var toolbar = this._toolbar || this._menu
@@ -650,6 +675,7 @@
     };
     utils.forEach(effects, function(item) {
       var tag = item.nodeName.toLowerCase();
+      console.log('tag------------', tag);
       switch(tag) {
         case 'a':
           if (inputBar) inputBar.value = item.getAttribute('href');
@@ -658,6 +684,10 @@
         case 'img':
           if (inputBar) inputBar.value = item.getAttribute('src');
           tag = 'insertimage';
+          break;
+        case 'font':
+          console.log('---font---');  //暂时不知道如何获取值
+          tag = 'forecolor';
           break;
         case 'i':
           tag = 'italic';
