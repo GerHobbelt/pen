@@ -210,7 +210,6 @@
         if (ctx._menu && !containsNode(editor, e.target) && !containsNode(ctx._menu, e.target)) {
           removeListener(ctx, doc, 'click', outsideClick);
           var inputValue = $('.pen-input').val();
-          console.log('--------inputValue', inputValue);
           if (inputValue) {
             menuApply('forecolor', inputValue);
           }
