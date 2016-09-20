@@ -1,3 +1,5 @@
+【仅供内部特别使用】内部使用的版本号从10.0.0开始
+
 # Pen Editor
 
 - **LIVE DEMO:** [http://sofish.github.io/pen](http://sofish.github.io/pen)
