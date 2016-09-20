@@ -164,7 +164,8 @@
       toggleNode(ctx._menu, true);
       doc.body.appendChild(ctx._menu);
       $(ctx._menu).find('input').colorpicker({
-        container: $(ctx._menu)
+        container: $(ctx._menu),
+        customClass: 'colorpicker-top'
       });
     }
     if (ctx._toolbar && ctx._inputBar) { toggleNode(ctx._inputBar); }
@@ -209,10 +210,6 @@
       outsideClick = function(e) {
         if (ctx._menu && !containsNode(editor, e.target) && !containsNode(ctx._menu, e.target)) {
           removeListener(ctx, doc, 'click', outsideClick);
-          var inputValue = $('.pen-input').val();
-          if (inputValue) {
-            menuApply('forecolor', inputValue);
-          }
           toggleMenu(100);  
         }
       };
@@ -739,10 +736,6 @@
   Pen.prototype.destroy = function(isAJoke) {
     var destroy = isAJoke ? false : true
       , attr = isAJoke ? 'setAttribute' : 'removeAttribute';
-    var inputValue = $('.pen-input').val();
-    if (inputValue) {
-      this.execCommand('forecolor', inputValue);
-    }
     if (!isAJoke) {
       removeAllListeners(this);
       try {
