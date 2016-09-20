@@ -8,8 +8,7 @@
   // allow command list
   var commandsReg = {
     block: /^(?:p|h[1-6]|blockquote|pre)$/,
-    inline: /^(?:bold|italic|underline|insertorderedlist|insertunorderedlist|indent|outdent)$/,
-    source: /^(?:createlink|unlink)$/,
+    inline: /^(?:bold|italic|underline|insertorderedlist|insertunorderedlist|indent|outdent|forecolor)$/,
     insert: /^(?:inserthorizontalrule|insertimage|insert)$/,
     wrap: /^(?:code)$/
   };
@@ -86,7 +85,7 @@
       textarea: '<textarea name="content"></textarea>',
       list: [
         'blockquote', 'h2', 'h3', 'p', 'code', 'insertorderedlist', 'insertunorderedlist', 'inserthorizontalrule',
-        'indent', 'outdent', 'bold', 'italic', 'underline', 'createlink', 'insertimage'
+        'indent', 'outdent', 'bold', 'italic', 'forecolor'
       ],
       cleanAttrs: ['id', 'class', 'style', 'name'],
       cleanTags: ['script']
@@ -141,8 +140,7 @@
   }
 
   function initToolbar(ctx) {
-    var icons = '', inputStr = '<input class="pen-input" placeholder="http://" />';
-
+    var icons = '', inputStr = '<input class="pen-input" placeholder="color:#" /><button class="pen-button btn btn-success">确定</button>';
     ctx._toolbar = ctx.config.toolbar;
     if (!ctx._toolbar) {
       var toolList = ctx.config.list;
@@ -150,22 +148,26 @@
         var klass = 'pen-icon icon-' + name;
         icons += '<i class="' + klass + '" data-action="' + name + '"></i>';
       }, true);
-      if (toolList.indexOf('createlink') >= 0 || toolList.indexOf('createlink') >= 0)
-        icons += inputStr;
-    } else if (ctx._toolbar.querySelectorAll('[data-action=createlink]').length ||
-      ctx._toolbar.querySelectorAll('[data-action=insertimage]').length) {
-      icons += inputStr;
-    }
+      if (toolList.indexOf('forecolor') != -1) { icons += inputStr; }       
+    } else if (ctx._toolbar.querySelectorAll('[data-action=forecolor]').length) { icons += inputStr; }
 
     if (icons) {
       ctx._menu = doc.createElement('div');
       ctx._menu.setAttribute('class', ctx.config.class + '-menu pen-menu');
       ctx._menu.innerHTML = icons;
-      ctx._inputBar = ctx._menu.querySelector('input');
+      var input = ctx._menu.querySelector('input'),
+        button = ctx._menu.querySelector('button');
+      if (input && button) {
+        ctx._inputBar = [];
+        ctx._inputBar.push(input, button);
+      }
       toggleNode(ctx._menu, true);
       doc.body.appendChild(ctx._menu);
+      $(ctx._menu).find('input').colorpicker({
+        container: $(ctx._menu)
+      });
     }
-    if (ctx._toolbar && ctx._inputBar) toggleNode(ctx._inputBar);
+    if (ctx._toolbar && ctx._inputBar) { toggleNode(ctx._inputBar); }
   }
 
   function initEvents(ctx) {
@@ -207,7 +209,11 @@
       outsideClick = function(e) {
         if (ctx._menu && !containsNode(editor, e.target) && !containsNode(ctx._menu, e.target)) {
           removeListener(ctx, doc, 'click', outsideClick);
-          toggleMenu(100);
+          var inputValue = $('.pen-input').val();
+          if (inputValue) {
+            menuApply('forecolor', inputValue);
+          }
+          toggleMenu(100);  
         }
       };
     } else {
@@ -260,18 +266,21 @@
     // toggle toolbar on key select
     addListener(ctx, toolbar, 'click', function(e) {
       var node = e.target, action;
-
       while (node !== toolbar && !(action = node.getAttribute('data-action'))) {
         node = node.parentNode;
       }
 
       if (!action) return;
-      if (!/(?:createlink)|(?:insertimage)/.test(action)) return menuApply(action);
+      if (!/(?:forecolor)/.test(action)) return menuApply(action);
       if (!ctx._inputBar) return;
 
-      // create link
-      var input = ctx._inputBar;
-      if (toolbar === ctx._menu) toggleNode(input);
+      // create font
+      var input = ctx._inputBar[0],
+        button = ctx._inputBar[1];
+      if (toolbar === ctx._menu) {
+        toggleNode(ctx._inputBar);
+        input.value = $(input).data('colorpicker').color;
+      }
       else {
         ctx._inputActive = true;
         ctx.menu();
@@ -279,24 +288,20 @@
       if (ctx._menu.style.display === 'none') return;
 
       setTimeout(function() { input.focus(); }, 400);
-      var createlink = function() {
+
+      var forecolor = function () {
         var inputValue = input.value;
-
-        if (!inputValue) action = 'unlink';
-        else {
-          inputValue = input.value
-            .replace(strReg.whiteSpace, '')
-            .replace(strReg.mailTo, 'mailto:$1')
-            .replace(strReg.http, 'http://$1');
-        }
+        if (!inputValue) inputValue = '#000';
         menuApply(action, inputValue);
-        if (toolbar === ctx._menu) toggleNode(input, false);
-        else toggleNode(ctx._menu, true);
+        // if (toolbar === ctx._menu) toggleNode(input, false);
+        // else toggleNode(ctx._menu, true);
       };
-
       input.onkeypress = function(e) {
-        if (e.which === 13) return createlink();
+        if (e.which === 13) return forecolor();
       };
+      button.onclick = function() {
+        return forecolor();
+      }
 
     });
 
@@ -434,38 +439,12 @@
     ctx.setRange(range);
   }
 
-  function autoLink(node) {
-    if (node.nodeType === 1) {
-      if (autoLinkReg.notLink.test(node.tagName)) return;
-      utils.forEach(node.childNodes, function (child) {
-        autoLink(child);
-      }, true);
-    } else if (node.nodeType === 3) {
-      var result = urlToLink(node.nodeValue || '');
-      if (!result.links) return;
-      var frag = doc.createDocumentFragment(),
-        div = doc.createElement('div');
-      div.innerHTML = result.text;
-      while (div.childNodes.length) frag.appendChild(div.childNodes[0]);
-      node.parentNode.replaceChild(frag, node);
-    }
-  }
-
-  function urlToLink(str) {
-    var count = 0;
-    str = str.replace(autoLinkReg.url, function(url) {
-      var realUrl = url, displayUrl = url;
-      count++;
-      if (url.length > autoLinkReg.maxLength) displayUrl = url.slice(0, autoLinkReg.maxLength) + '...';
-      // Add http prefix if necessary
-      if (!autoLinkReg.prefix.test(realUrl)) realUrl = 'http://' + realUrl;
-      return '<a href="' + realUrl + '">' + displayUrl + '</a>';
-    });
-    return {links: count, text: str};
-  }
-
   function toggleNode(node, hide) {
-    node.style.display = hide ? 'none' : 'block';
+    if (Array.isArray(node)) {
+      for (var i = 0; i < node.length; i++) {
+        node[i].style.display = hide ? 'none' : 'block';
+      }
+    } else { node.style.display = hide ? 'none' : 'block'; }
   }
 
   Pen = function(config) {
@@ -615,9 +594,8 @@
     return this;
   };
 
-  // auto link content, return content
-  Pen.prototype.autoLink = function() {
-    autoLink(this.config.editor);
+  Pen.prototype.autoColor = function() {
+    autoColor(this.config.editor);
     return this.getContent();
   };
 
@@ -638,9 +616,11 @@
 
     if (inputBar && toolbar === this._menu) {
       // display link input if createlink enabled
-      inputBar.style.display = 'none';
+      for (var i = 0; i<inputBar.length; i++) {
+        inputBar[i].style.display = 'none';
+      }
       // reset link input value
-      inputBar.value = '';
+      inputBar[0].value = '';
     }
 
     highlight = function(str) {
@@ -651,13 +631,13 @@
     utils.forEach(effects, function(item) {
       var tag = item.nodeName.toLowerCase();
       switch(tag) {
-        case 'a':
-          if (inputBar) inputBar.value = item.getAttribute('href');
-          tag = 'createlink';
-          break;
         case 'img':
           if (inputBar) inputBar.value = item.getAttribute('src');
           tag = 'insertimage';
+          break;
+        case 'font':
+          // console.log('---font---');  //暂时不知道如何获取值
+          tag = 'forecolor';
           break;
         case 'i':
           tag = 'italic';
@@ -759,7 +739,10 @@
   Pen.prototype.destroy = function(isAJoke) {
     var destroy = isAJoke ? false : true
       , attr = isAJoke ? 'setAttribute' : 'removeAttribute';
-
+    var inputValue = $('.pen-input').val();
+    if (inputValue) {
+      this.execCommand('forecolor', inputValue);
+    }
     if (!isAJoke) {
       removeAllListeners(this);
       try {
